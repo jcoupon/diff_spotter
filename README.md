@@ -1,4 +1,4 @@
-# diff_spotter
+# Difference spotter
 
 A popular game consists of finding the differences between 2 images. In this project we develop an application to do it automatically, using computer vision tools in Python (OpenCV and Scikit-image).
 
