@@ -4,6 +4,8 @@ A popular game consists of finding the differences between 2 images. In this pro
 
 ## Main algorithm
 
+Blog post: http://jeancoupon.com/a-difference-spotter-algorithm/
+
 The main algorithm is about finding the differences between two perfectly aligned images and displaying the result.
 
 The steps are relatively simple:
