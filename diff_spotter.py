@@ -268,4 +268,176 @@ def align_images(im1, im2, warp_mode = cv2.MOTION_TRANSLATION):
     #cv2.waitKey(0)
 
     return im1, im2_aligned
+
+
+def two_similar_rectangles(img):
+    """Run contour algorithm and find
+    2 similar contour rectangles
+    """
     
+    img, contours, hierarchy = cv2.findContours(
+        img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+
+    width, height = img.shape[0], img.shape[1]
+    total_area = width*height
+
+    rects = []
+    for cnt in contours:
+
+        bbox = cv2.boundingRect(cnt)
+        x,y,w,h = bbox
+        area = w*h
+
+        # must be at least larger than 1/8
+        # and smaller than half of the image
+        #if (w<width/8 or w>width/2) or (h<height/8 or h>width/2):
+        #    continue
+        if (w<width/8) or (h<height/8) or area > total_area/2:
+            continue
+
+        # we take the sum of area plus width
+        # to take he shape into account
+        # when comparing two rectangles
+        #rects.append((x,y,w,h, area+w**2))
+        #comp = int(img[y:y+w, x:x+w].sum()) + area + w**2
+        rects.append((x,y,w,h, area))
+        
+        ## Draw rect
+        #cv2.rectangle(dst, (x,y), (x+w,y+h), (255,0,0), 1, 16)
+
+    rects = np.array(rects)
+
+    #return rects, 0
+
+    if len(rects) > 1:
+        sorted_indices = (-rects[:,4]).argsort()
+        
+        rects = rects[sorted_indices]
+        #print(rects)
+
+        result = []
+        # find similar rectangles and return pairs
+        # return empty set otherwise
+        
+        # initiate with 1000% different in size
+        for i in sorted_indices[1:]:
+            area_diff = abs(rects[i, 4]-rects[i-1, 4])/rects[i, 4]
+            if area_diff < 0.05:
+                result.append(rects[[i-1, i]])
+
+        return result
+    else:
+        return []
+    
+
+def find_images(img):
+    """Find 2 similar images in a larger image
+    """
+    
+    #min_thres = 200
+    #min_thres = 250
+
+    max_area = -np.inf
+    min_diff_rects = []
+    for min_thres in range(0, 255, 10):
+    #for min_thres in range(170, 180, 10):
+        
+        # binary image
+        ret, binary = cv2.threshold(img, min_thres, 255, cv2.THRESH_BINARY_INV)
+
+        # remove noise
+        kernel = cv2.getStructuringElement(shape=cv2.MORPH_RECT, ksize=(2,2))
+        binary_clean = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+
+        # dilate
+        # binary_clean = cv2.morphologyEx(dilate, cv2.MORPH_DILATE, kernel*2)
+        
+        rects = two_similar_rectangles(binary_clean)
+        print(rects)
+        if len(rects) and rects[0][0][4] > max_area:
+            max_area = rects[0][0][4]
+
+            min_diff_rects = rects[0]
+
+            #print(rects[0][0][4], min_diff_rects)
+
+        #if (diff<min_diff):
+        #    min_diff = diff
+        #    min_diff_rects = rects
+
+        #print(min_thres, rects)              
+    
+    dst = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    for rec in min_diff_rects:
+
+        #continue
+        #bbox = cv2.boundingRect(rec)
+        x,y,w,h,_ = rec
+
+        ## Draw rect
+        cv2.rectangle(dst, (x,y), (x+w,y+h), (0,0,255), 1, 16)
+    
+    return dst
+
+
+def main(args):
+    """ Main function
+    """
+
+
+    # Connects to your computer's default camera
+    cap = cv2.VideoCapture(0)
+
+
+    # Automatically grab width and height from video feed
+    # (returns float which we need to convert to integer for later on!)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    while True:
+        
+        # Capture frame-by-frame
+        ret, frame = cap.read()
+
+        # resampling
+        rf = int(width/400)
+
+
+        # Our operations on the frame come here
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #img_small = cv2.medianBlur(img[::rf, ::rf], 1)
+        img_small = gray[::rf, ::rf]
+
+        result = find_images(img_small)
+
+        # Display the resulting frame
+        cv2.imshow('frame',result)
+        
+        # This command let's us quit with the "q" button on a keyboard.
+        # Simply pressing X on the window won't work!
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # When everything done, release the capture and destroy the windows
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    #parser.add_argument(
+    #    'task',
+    #    help='Task to perform among \'clean\',\'train\', ,\'train_classifier\', \'predict\' and \'predict_classifier\'',
+    #
+    # 
+    # )
+
+    args = parser.parse_args()
+
+
+    main(args)
